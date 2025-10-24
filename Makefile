@@ -1,5 +1,11 @@
-# filepath: /home/manuelcastiblan/academic/mlflow-deploy/mlflow-deploy/Makefile
+.PHONY: help train validate
+
+help:
+	@echo "make train     - Entrena y registra el modelo"
+	@echo "make validate  - Valida el modelo"
+
 train:
-	python train.py  
+	python train.py
+
 validate:
-	python validate.py 
+	python validate.py
