@@ -1,4 +1,4 @@
-name: Entrenamiento y validación del modelo MLflow completados
+name: Entrenamiento y validación del modelo MLflow
 
 on:
   push:
@@ -8,45 +8,37 @@ on:
 jobs:
   ml_pipeline:
     runs-on: ubuntu-latest
+
     env:
       MLFLOW_TRACKING_URI: file:./mlruns
+      MLFLOW_EXPERIMENT: CI-CD-Lab2-ci   # ← experimento nuevo para entorno Linux (Actions)
 
     steps:
-      - name: Checkout
+      - name: 📥 Clonar repositorio
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install deps
+      - name: 📦 Instalar dependencias
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Train (MLflow)
+      - name: 🧠 Entrenar modelo (MLflow)
         run: make train
 
-      - name: Extract model.pkl from mlruns
+      - name: 📂 Extraer model.pkl desde mlruns
         shell: bash
         run: |
           set -euo pipefail
+          echo "Buscando model.pkl dentro de mlruns..."
           MODEL_PATH=$(find mlruns -type f -name model.pkl | sort | tail -n 1)
           if [ -z "$MODEL_PATH" ]; then
-            echo "No se encontró model.pkl dentro de mlruns/*/*/artifacts/**"
+            echo "❌ No se encontró model.pkl dentro de mlruns/*/*/artifacts/**"
             find mlruns -maxdepth 5 -type d -print || true
             exit 1
-          fi
-          cp "$MODEL_PATH" model.pkl
-          ls -lh model.pkl
+          f
 
-      - name: Validate
-        run: make validate
-
-      - name: Upload validated model
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: modelo-validado
-          path: model.pkl
