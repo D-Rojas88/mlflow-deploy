@@ -11,7 +11,7 @@ jobs:
 
     env:
       MLFLOW_TRACKING_URI: file:./mlruns
-      MLFLOW_EXPERIMENT: CI-CD-Lab2-ci   # ← experimento nuevo para entorno Linux (Actions)
+      MLFLOW_EXPERIMENT: CI-CD-Lab2-ci   # experimento limpio en Linux (evita rutas de Windows)
 
     steps:
       - name: 📥 Clonar repositorio
@@ -35,10 +35,23 @@ jobs:
         run: |
           set -euo pipefail
           echo "Buscando model.pkl dentro de mlruns..."
-          MODEL_PATH=$(find mlruns -type f -name model.pkl | sort | tail -n 1)
+          MODEL_PATH=$(find mlruns -type f -name model.pkl | sort | tail -n 1 || true)
           if [ -z "$MODEL_PATH" ]; then
             echo "❌ No se encontró model.pkl dentro de mlruns/*/*/artifacts/**"
-            find mlruns -maxdepth 5 -type d -print || true
+            echo "Estructura mlruns encontrada:"
+            find mlruns -maxdepth 5 -print || true
             exit 1
-          f
+          fi
+          cp "$MODEL_PATH" model.pkl
+          echo "✅ Copiado a la raíz del proyecto:"
+          ls -lh model.pkl
 
+      - name: ✅ Validar modelo
+        run: make validate
+
+      - name: 📤 Subir modelo validado como artefacto
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelo-validado
+          path: model.pkl
