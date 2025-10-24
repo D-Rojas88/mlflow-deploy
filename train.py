@@ -1,112 +1,123 @@
+# train.py
 import os
+import json
+from pathlib import Path
+
 import mlflow
 import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-import pandas as pd
-from mlflow.models import infer_signature
-import sys
-import traceback
-from pathlib import Path  # ✅ NUEVO
 
-print(f"--- Debug: Initial CWD: {os.getcwd()} ---")
 
-# --- Define Paths ---
-workspace_dir = os.getcwd()
-mlruns_dir = os.path.join(workspace_dir, "mlruns")
+def ensure_tracking_and_registry():
+    """
+    Configura URIs válidas de MLflow para tracking y registry.
+    Por defecto usa almacenamiento local: file:./mlruns
+    """
+    # Directorio local donde MLflow guardará runs y artefactos
+    mlruns_dir = Path("mlruns")
+    mlruns_dir.mkdir(parents=True, exist_ok=True)
 
-# ✅ Construir URIs válidos en Windows (file:///C:/...)
-mlruns_uri = Path(mlruns_dir).resolve().as_uri()
-tracking_uri = mlruns_uri
-artifact_location = mlruns_uri
-
-print(f"--- Debug: Workspace Dir: {workspace_dir} ---")
-print(f"--- Debug: MLRuns Dir: {mlruns_dir} ---")
-print(f"--- Debug: Tracking URI: {tracking_uri} ---")
-print(f"--- Debug: Desired Artifact Location Base: {artifact_location} ---")
-
-# --- Asegurar que el directorio MLRuns exista ---
-os.makedirs(mlruns_dir, exist_ok=True)
-
-# --- Configurar MLflow ---
-mlflow.set_tracking_uri(tracking_uri)
-mlflow.set_registry_uri(tracking_uri)  # ✅ NUEVO: registry local
-
-# --- Crear o Establecer Experimento con Artifact Location ---
-experiment_name = "CI-CD-Lab2"
-experiment_id = None
-try:
-    experiment_id = mlflow.create_experiment(
-        name=experiment_name,
-        artifact_location=artifact_location
-    )
-    print(f"--- Debug: Creado Experimento '{experiment_name}' con ID: {experiment_id} ---")
-except mlflow.exceptions.MlflowException as e:
-    if "RESOURCE_ALREADY_EXISTS" in str(e):
-        print(f"--- Debug: Experimento '{experiment_name}' ya existe. Obteniendo ID. ---")
-        experiment = mlflow.get_experiment_by_name(experiment_name)
-        if experiment:
-            experiment_id = experiment.experiment_id
-            print(f"--- Debug: ID del Experimento Existente: {experiment_id} ---")
-            print(f"--- Debug: Ubicación de Artefacto del Experimento Existente: {experiment.artifact_location} ---")
-            if experiment.artifact_location != artifact_location:
-                print(f"--- WARNING: artifact_location existente ('{experiment.artifact_location}') != deseada ('{artifact_location}') ---")
-        else:
-            print(f"--- ERROR: No se pudo obtener el experimento existente '{experiment_name}' por nombre. ---")
-            sys.exit(1)
+    # Si el usuario pasó un MLFLOW_TRACKING_URI lo respetamos; si no, usamos file:./mlruns
+    tracking_uri_env = os.getenv("MLFLOW_TRACKING_URI")
+    if tracking_uri_env:
+        tracking_uri = tracking_uri_env
     else:
-        print(f"--- ERROR creando/obteniendo experimento: {e} ---")
-        raise e
+        # URI válida multiplataforma (file:///C:/... en Windows, file:///home/... en Linux)
+        tracking_uri = mlruns_dir.resolve().as_uri()
 
-if experiment_id is None:
-    print(f"--- ERROR FATAL: No se pudo obtener un ID de experimento válido para '{experiment_name}'. ---")
-    sys.exit(1)
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_registry_uri(tracking_uri)
 
-# --- Cargar Datos y Entrenar Modelo ---
-X, y = load_diabetes(return_X_y=True)
-# (Opcional) fija semilla para reproducibilidad
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    print(f"[DEBUG] Tracking URI: {mlflow.get_tracking_uri()}")
+    print(f"[DEBUG] Registry  URI: {mlflow.get_registry_uri()}")
 
-model = LinearRegression()
-model.fit(X_train, y_train)
-preds = model.predict(X_test)
-mse = mean_squared_error(y_test, preds)
+    return tracking_uri
 
-# --- Iniciar Run de MLflow ---
-print(f"--- Debug: Iniciando run de MLflow en Experimento ID: {experiment_id} ---")
-run = None
-try:
+
+def get_or_create_experiment(experiment_name: str) -> str:
+    """
+    Devuelve el experiment_id. Si el experimento no existe, lo crea
+    con artifact_location en ./mlruns (mismo FileStore).
+    """
+    client = MlflowClient()
+    exp = client.get_experiment_by_name(experiment_name)
+    if exp is None:
+        artifact_location = Path("mlruns").resolve().as_uri()
+        experiment_id = client.create_experiment(
+            name=experiment_name,
+            artifact_location=artifact_location,
+        )
+        print(f"[DEBUG] Creado experimento '{experiment_name}' (ID: {experiment_id})")
+    else:
+        experiment_id = exp.experiment_id
+        print(f"[DEBUG] Usando experimento existente '{experiment_name}' (ID: {experiment_id})")
+        print(f"[DEBUG] artifact_location: {exp.artifact_location}")
+    # También setea el contexto por comodidad (no es estrictamente necesario)
+    mlflow.set_experiment(experiment_name)
+    return experiment_id
+
+
+def train_and_log(experiment_id: str, test_size: float = 0.2, seed: int = 42):
+    """
+    Entrena un modelo simple y registra todo en MLflow.
+    """
+    # Datos
+    X, y = load_diabetes(return_X_y=True)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=seed
+    )
+
+    # Modelo
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+    mse = float(mean_squared_error(y_test, preds))
+
+    print(f"[INFO] MSE (test): {mse:.4f}")
+
+    # Run de MLflow
     with mlflow.start_run(experiment_id=experiment_id) as run:
         run_id = run.info.run_id
-        actual_artifact_uri = run.info.artifact_uri
-        print(f"--- Debug: Run ID: {run_id} ---")
-        print(f"--- Debug: URI Real del Artefacto del Run: {actual_artifact_uri} ---")
+        print(f"[DEBUG] run_id: {run_id}")
+        print(f"[DEBUG] artifact_uri: {run.info.artifact_uri}")
 
-        # (Opcional) Chequeo solo informativo (evita os.path.join en URIs)
-        expected_artifact_uri_base = f"{artifact_location}/{run_id}/artifacts"
-        if actual_artifact_uri != expected_artifact_uri_base:
-            print(f"--- WARNING: artifact_uri run '{actual_artifact_uri}' != '{expected_artifact_uri_base}' (puede ser normal). ---")
-
+        # Parámetros y métricas
+        mlflow.log_params({
+            "model": "LinearRegression",
+            "test_size": test_size,
+            "random_state": seed,
+        })
         mlflow.log_metric("mse", mse)
-        print(f"--- Debug: Intentando log_model con artifact_path='model' ---")
 
+        # Artefacto auxiliar (resumen)
+        artifacts_dir = Path("artifacts")
+        artifacts_dir.mkdir(exist_ok=True)
+        with open(artifacts_dir / "metrics.json", "w") as f:
+            json.dump({"mse": mse}, f, indent=2)
+        mlflow.log_artifact(str(artifacts_dir / "metrics.json"))
+
+        # Registrar modelo (sklearn flavor). Quedará en:
+        # mlruns/<exp_id>/<run_id>/artifacts/models/...
         mlflow.sklearn.log_model(
             sk_model=model,
-            artifact_path="model"
+            artifact_path="models",
         )
-        print(f"✅ Modelo registrado correctamente. MSE: {mse:.4f}")
 
-except Exception as e:
-    print(f"\n--- ERROR durante la ejecución de MLflow ---")
-    traceback.print_exc()
-    print(f"--- Fin de la Traza de Error ---")
-    print(f"CWD actual en el error: {os.getcwd()}")
-    print(f"Tracking URI usada: {mlflow.get_tracking_uri()}")
-    print(f"Experiment ID intentado: {experiment_id}")
-    if run:
-        print(f"URI del Artefacto del Run en el error: {run.info.artifact_uri}")
-    else:
-        print("El objeto Run no se creó con éxito.")
-    sys.exit(1)
+    print("✅ Entrenamiento y registro completados.")
+
+
+if __name__ == "__main__":
+    # 1) Configurar MLflow (tracking/registry locales)
+    ensure_tracking_and_registry()
+
+    # 2) Obtener/crear experimento
+    EXPERIMENT_NAME = "CI-CD-Lab2"
+    experiment_id = get_or_create_experiment(EXPERIMENT_NAME)
+
+    # 3) Entrenar y registrar
+    train_and_log(experiment_id=experiment_id)
