@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/danie/OneDrive/Documentos/GitHub/mlflow-deploy/mlruns/5b17057c26424f1c83616c79cfa95be5/artifacts
+end_time: 1761347418031
+entry_point_name: ''
+experiment_id: '152304626558540838'
+lifecycle_stage: active
+run_id: 5b17057c26424f1c83616c79cfa95be5
+run_name: gentle-newt-875
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761347404602
+status: 3
+tags: []
+user_id: danie

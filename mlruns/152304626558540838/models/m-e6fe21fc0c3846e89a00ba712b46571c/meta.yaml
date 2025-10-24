@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/danie/OneDrive/Documentos/GitHub/mlflow-deploy/mlruns/models/m-e6fe21fc0c3846e89a00ba712b46571c/artifacts
+creation_timestamp: 1761347404828
+experiment_id: '152304626558540838'
+last_updated_timestamp: 1761347417999
+model_id: m-e6fe21fc0c3846e89a00ba712b46571c
+model_type: null
+name: model
+source_run_id: 5b17057c26424f1c83616c79cfa95be5
+status: 2
+status_message: null
