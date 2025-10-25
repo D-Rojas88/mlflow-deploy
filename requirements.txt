@@ -6,3 +6,7 @@ numpy
 matplotlib
 skops
 black
+mlflow
+azureml-mlflow
+azure-identity
+azure-ai-ml
