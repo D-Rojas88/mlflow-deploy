@@ -1,6 +1,7 @@
 Taller CI/CD con MLflow y GitHub Actions
 
-Autora: Daniela Rojas Silva
+Presentado por: Daniela Rojas Silva - Geraldine Patiño
+
 Proyecto: Taller CI/CD – Entrenamiento y Validación de un Modelo con MLflow
 
 Descripción del Proyecto
