@@ -13,12 +13,19 @@ El objetivo es automatizar el proceso completo de entrenamiento y validación de
 Estructura del Proyecto
 mlflow-deploy/
 ├── train.py                → Entrena y registra el modelo en MLflow
+
 ├── validate.py             → Carga y valida el modelo entrenado
+
 ├── requirements.txt        → Dependencias del entorno
+
 ├── Makefile                → Comandos automatizados para entrenamiento y validación
+
 ├── .github/
+
 │   └── workflows/
+
 │       └── mlflow-ci.yml   → Pipeline de GitHub Actions para CI/CD
+
 └── mlruns/                 → Carpeta local de tracking de MLflow
 
 Ejecución Local
