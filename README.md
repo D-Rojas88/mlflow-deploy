@@ -11,7 +11,9 @@ Este proyecto implementa un pipeline de entrenamiento, registro y validación de
 El objetivo es automatizar el proceso completo de entrenamiento y validación del modelo, garantizando trazabilidad, reproducibilidad y registro de métricas.
 
 Estructura del Proyecto
+
 mlflow-deploy/
+
 ├── train.py                → Entrena y registra el modelo en MLflow
 
 ├── validate.py             → Carga y valida el modelo entrenado
